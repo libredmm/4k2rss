@@ -4,7 +4,7 @@
 
 source $DOTFILES/lib/log.sh
 
-PAGE_NUM=5
+PAGE_NUM=3
 
 while getopts ":p:" opt; do
     case $opt in

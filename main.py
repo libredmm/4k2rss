@@ -48,7 +48,7 @@ async def scrape(category, pages, output):
 
     feed = FeedGenerator()
     feed.title(feed_title)
-    feed.link(href='https://4k2.com/forum-{category}-1.htm?orderby=tid')
+    feed.link(href=f'https://4k2.com/forum-{category}-1.htm?orderby=tid')
     feed.description(feed_title)
     for thread in threads:
         entry = feed.add_entry()
