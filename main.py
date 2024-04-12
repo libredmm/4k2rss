@@ -81,7 +81,12 @@ async def scrape_all(pages):
 
 
 @click.command()
-@click.option('--pages', default=1, help='Number of pages to scrape')
+@click.option(
+    '--pages',
+    default=1,
+    envvar='PAGES',
+    help='Number of pages to scrape',
+)
 def main(pages):
     asyncio.run(scrape_all(pages))
 
