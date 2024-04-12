@@ -1,0 +1,1 @@
+* * * * *  bash -c "/usr/local/bin/python /usr/src/app/main.py >> /tmp/out.log 2>> /tmp/out.log"

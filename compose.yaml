@@ -1,5 +1,5 @@
 services:
-  main:
+  4k2rss:
     build: .
     env_file:
       - .env
