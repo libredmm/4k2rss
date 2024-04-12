@@ -1,5 +1,6 @@
 import aiohttp
 import asyncio
+import boto3
 import click
 
 from bs4 import BeautifulSoup
@@ -32,12 +33,14 @@ async def parse_thread(session, url):
     )
 
 
-async def scrape(category, pages, output):
+s3_client = boto3.client('s3')
+
+async def scrape(*, category_id, category_name, pages):
     feed_title = None
     async with aiohttp.ClientSession() as session:
         thread_tasks = []
         for page in range(1, pages + 1):
-            url = f'https://4k2.com/forum-{category}-{page}.htm?orderby=tid'
+            url = f'https://4k2.com/forum-{category_id}-{page}.htm?orderby=tid'
             soup = await get_and_parse(session, url)
             if feed_title is None:
                 feed_title = soup.title.string 
@@ -45,10 +48,11 @@ async def scrape(category, pages, output):
                 thread_tasks.append(parse_thread(session, a['href']))
         threads = await asyncio.gather(*thread_tasks)
         threads.sort(key=lambda t: t.link)
+    print(f'Scraped {len(threads)} entries for {category_name}')
 
     feed = FeedGenerator()
     feed.title(feed_title)
-    feed.link(href=f'https://4k2.com/forum-{category}-1.htm?orderby=tid')
+    feed.link(href=f'https://4k2.com/forum-{category_id}-1.htm?orderby=tid')
     feed.description(feed_title)
     for thread in threads:
         entry = feed.add_entry()
@@ -56,14 +60,30 @@ async def scrape(category, pages, output):
         entry.link(href=thread.link)
         entry.description(thread.description)
         entry.enclosure(thread.enclosure_url, 0, 'application/x-bittorrent')
-    feed.rss_file(output)
+    print(f'Generated feed for {category_name}')
+
+    s3_client.put_object(
+        Bucket='libredmm',
+        Key=f'feeds/4k2/{category_name}.xml',
+        Body=feed.rss_str(pretty=True),
+        ACL='public-read',
+        ContentType="application/rss+xml"
+    )
+    print(f'Uploaded feed for {category_name}')
+
+
+async def scrape_all(pages):
+    await asyncio.gather(
+        scrape(category_id='1', category_name='hd', pages=pages),
+        scrape(category_id='3', category_name='4k', pages=pages),
+    )
 
 
 @click.command()
-@click.option('--category', default='1', help='Category ID')
 @click.option('--pages', default=1, help='Number of pages to scrape')
-@click.option('--output', default='feed.xml', help='Output file')
-def main(category, pages, output):
-    asyncio.run(scrape(category, pages, output))
+def main(pages):
+    asyncio.run(scrape_all(pages))
 
-asyncio.run(main())
+
+if __name__ == '__main__':
+    asyncio.run(main())
