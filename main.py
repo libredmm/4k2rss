@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 import boto3
 import click
+import glog
 
 from bs4 import BeautifulSoup
 from collections import namedtuple
@@ -48,7 +49,7 @@ async def scrape(*, category_id, category_name, pages):
                 thread_tasks.append(parse_thread(session, a['href']))
         threads = await asyncio.gather(*thread_tasks)
         threads.sort(key=lambda t: t.link)
-    print(f'Scraped {len(threads)} entries for {category_name}')
+    glog.info(f'Scraped {len(threads)} entries for {category_name}')
 
     feed = FeedGenerator()
     feed.title(feed_title)
@@ -60,7 +61,7 @@ async def scrape(*, category_id, category_name, pages):
         entry.link(href=thread.link)
         entry.description(thread.description)
         entry.enclosure(thread.enclosure_url, 0, 'application/x-bittorrent')
-    print(f'Generated feed for {category_name}')
+    glog.info(f'Generated feed for {category_name}')
 
     s3_client.put_object(
         Bucket='libredmm',
@@ -69,7 +70,7 @@ async def scrape(*, category_id, category_name, pages):
         ACL='public-read',
         ContentType="application/rss+xml"
     )
-    print(f'Uploaded feed for {category_name}')
+    glog.info(f'Uploaded feed for {category_name}')
 
 
 async def scrape_all(pages):
