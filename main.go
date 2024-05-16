@@ -1,14 +1,21 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	aws_config "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3_types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gorilla/feeds"
 )
 
@@ -29,7 +36,7 @@ func get_and_parse(u string) *goquery.Document {
 
 func scrape_thread(href string) feeds.Item {
 	thread_url, _ := url.JoinPath(BASE_URL, href)
-	log.Println(thread_url)
+	// log.Println(thread_url)
 	doc := get_and_parse(thread_url)
 	enclosure_url, _ := url.JoinPath(
 		BASE_URL,
@@ -44,7 +51,7 @@ func scrape_thread(href string) feeds.Item {
 
 func scrape_forum_page(items chan<- feeds.Item, category int, page int) {
 	forum_url := fmt.Sprintf("https://4k2.com/forum-%d-%d.htm?orderby=tid", category, page)
-	log.Println(forum_url)
+	// log.Println(forum_url)
 	doc := get_and_parse(forum_url)
 	var wg sync.WaitGroup
 	doc.Find("ul.threadlist li.thread div.media-body div.style3_subject a[href^='thread-']").Each(
@@ -58,7 +65,7 @@ func scrape_forum_page(items chan<- feeds.Item, category int, page int) {
 	wg.Wait()
 }
 
-func scrape_forum(id int, max_page int, title string) {
+func scrape_forum(id int, max_page int, title string, s3_path string) {
 	items := make(chan feeds.Item)
 	var wg sync.WaitGroup
 	for page := 1; page <= max_page; page++ {
@@ -88,9 +95,38 @@ func scrape_forum(id int, max_page int, title string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(rss)
+	log.Printf("RSS generated, category: %d, items#: %d", id, len(feed.Items))
+	aws_cfg, err := aws_config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
+	s3_client := s3.NewFromConfig(aws_cfg)
+	_, err = s3_client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket:      aws.String("libredmm"),
+		Key:         &s3_path,
+		ACL:         s3_types.ObjectCannedACLPublicRead,
+		Body:        strings.NewReader(rss),
+		ContentType: aws.String("application/rss+xml"),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Uploaded to s3: %s", s3_path)
 }
 
 func main() {
-	scrape_forum(1, 1, "亚洲有码-4K2社区")
+	pages := flag.Int("pages", 3, "Scrape first N pages")
+	flag.Parse()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		scrape_forum(1, *pages, "亚洲有码-4K2社区", "feeds/4k2/hd.xml")
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		scrape_forum(3, *pages, "4K专区-4K2社区", "feeds/4k2/4k.xml")
+	}()
+	wg.Wait()
 }
