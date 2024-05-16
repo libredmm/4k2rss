@@ -14,12 +14,8 @@ import (
 
 const BASE_URL = "https://4k2.com/"
 
-func scrape_thread(href string) feeds.Item {
-	thread_url, err := url.JoinPath(BASE_URL, href)
-	if err != nil {
-		log.Fatal(err)
-	}
-	res, err := http.Get(thread_url)
+func get_and_parse(u string) *goquery.Document {
+	res, err := http.Get(u)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,12 +24,16 @@ func scrape_thread(href string) feeds.Item {
 	if err != nil {
 		log.Fatal(err)
 	}
-	enclosure_url, err := url.JoinPath(
+	return doc
+}
+
+func scrape_thread(href string) feeds.Item {
+	thread_url, _ := url.JoinPath(BASE_URL, href)
+	log.Println(thread_url)
+	doc := get_and_parse(thread_url)
+	enclosure_url, _ := url.JoinPath(
 		BASE_URL,
 		doc.Find("ul.attachlist a[href^='attach-download']").AttrOr("href", ""))
-	if err != nil {
-		log.Fatal(err)
-	}
 	return feeds.Item{
 		Title:       doc.Find("title").Text(),
 		Link:        &feeds.Link{Href: thread_url},
@@ -43,28 +43,17 @@ func scrape_thread(href string) feeds.Item {
 }
 
 func scrape_forum_page(items chan<- feeds.Item, category int, page int) {
-	log.Printf("Forum: category=%d, page=%d", category, page)
 	forum_url := fmt.Sprintf("https://4k2.com/forum-%d-%d.htm?orderby=tid", category, page)
-	res, err := http.Get(forum_url)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	log.Println(forum_url)
+	doc := get_and_parse(forum_url)
 	var wg sync.WaitGroup
 	doc.Find("ul.threadlist li.thread div.media-body div.style3_subject a[href^='thread-']").Each(
 		func(i int, s *goquery.Selection) {
-			thread_url, exists := s.Attr("href")
-			if exists {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					items <- scrape_thread(thread_url)
-				}()
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				items <- scrape_thread(s.AttrOr("href", ""))
+			}()
 		})
 	wg.Wait()
 }
@@ -90,7 +79,6 @@ func scrape_forum(id int, max_page int, title string) {
 		Created:     time.Now(),
 	}
 	for item := range items {
-		log.Printf("Thread: %s", item.Title)
 		feed.Add(&item)
 	}
 	feed.Sort(func(a, b *feeds.Item) bool {
