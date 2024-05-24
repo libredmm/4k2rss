@@ -114,19 +114,33 @@ func scrape_forum(id int, max_page int, title string, s3_path string) {
 	log.Printf("Uploaded to s3: %s", s3_path)
 }
 
+func scrape(pages int, interval int, dryrun bool) {
+	if dryrun {
+		log.Println("Dry run")
+	} else {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			scrape_forum(1, pages, "亚洲有码-4K2社区", "feeds/4k2/hd.xml")
+		}()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			scrape_forum(3, pages, "4K专区-4K2社区", "feeds/4k2/4k.xml")
+		}()
+		wg.Wait()
+	}
+	if interval > 0 {
+		time.Sleep(time.Duration(interval) * time.Second)
+		scrape(pages, interval, dryrun)
+	}
+}
+
 func main() {
 	pages := flag.Int("pages", 3, "Scrape first N pages")
+	interval := flag.Int("interval", 0, "Interval in seconds for repeated scraping, 0 for no repeat")
+	dryrun := flag.Bool("dryrun", false, "Dry run")
 	flag.Parse()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		scrape_forum(1, *pages, "亚洲有码-4K2社区", "feeds/4k2/hd.xml")
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		scrape_forum(3, *pages, "4K专区-4K2社区", "feeds/4k2/4k.xml")
-	}()
-	wg.Wait()
+	scrape(*pages, *interval, *dryrun)
 }
