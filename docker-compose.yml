@@ -1,0 +1,7 @@
+services:
+  worker:
+    env_file:
+      - .env
+    restart: always
+    build: .
+    command: "--pages=5 --interval=600"

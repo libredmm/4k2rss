@@ -132,6 +132,7 @@ func scrape(pages int, interval int, dryrun bool) {
 		wg.Wait()
 	}
 	if interval > 0 {
+		log.Printf("Sleeping for %d seconds before next run", interval)
 		time.Sleep(time.Duration(interval) * time.Second)
 		scrape(pages, interval, dryrun)
 	}
