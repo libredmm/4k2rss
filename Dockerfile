@@ -1,4 +1,6 @@
-FROM golang:1.22.3
+FROM golang:1.22.3-alpine
+RUN apk add --no-cache tzdata
+ENV TZ=America/Los_Angeles
 
 WORKDIR /app
 COPY go.mod go.sum ./
