@@ -4,4 +4,4 @@ services:
       - .env
     restart: always
     build: .
-    command: "--pages=5 --interval=3600 --dryrun"
+    command: "-pages=5 -interval=3600"
