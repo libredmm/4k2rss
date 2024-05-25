@@ -1,5 +1,4 @@
-FROM golang:1.22.3-alpine
-RUN apk add --no-cache tzdata
+FROM golang:1.22.3
 ENV TZ=America/Los_Angeles
 
 WORKDIR /app
