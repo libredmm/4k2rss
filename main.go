@@ -23,8 +23,8 @@ import (
 const BASE_URL = "https://4k2.com/"
 
 func get_full_url(path string) string {
-	base, ok := os.LookupEnv("BASE_URL")
-	if !ok {
+	base := os.Getenv("BASE_URL")
+	if base == "" {
 		base = BASE_URL
 	}
 	full_url, _ := url.JoinPath(base, path)
@@ -95,7 +95,7 @@ func scrape_forum(id int, max_page int, title string, s3_path string) {
 	}()
 	feed := &feeds.Feed{
 		Title:       title,
-		Link:        &feeds.Link{Href: fmt.Sprintf("https://4k2.com/forum-%d-1.htm?orderby=tid", id)},
+		Link:        &feeds.Link{Href: get_full_url(fmt.Sprintf("forum-%d-1.htm?orderby=tid", id))},
 		Description: title,
 		Created:     time.Now(),
 	}
