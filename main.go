@@ -122,12 +122,12 @@ func scrape(pages int, interval int, dryrun bool) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			scrape_forum(1, pages, "亚洲有码-4K2社区", "feeds/4k2/hd.xml")
+			scrape_forum(1, pages, "4K2社区-亚洲有码", "feeds/4k2/hd.xml")
 		}()
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			scrape_forum(3, pages, "4K专区-4K2社区", "feeds/4k2/4k.xml")
+			scrape_forum(3, pages, "4K2社区-4K专区", "feeds/4k2/4k.xml")
 		}()
 		wg.Wait()
 	}
