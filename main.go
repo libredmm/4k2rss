@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,15 @@ import (
 )
 
 const BASE_URL = "https://4k2.com/"
+
+func get_full_url(path string) string {
+	base, ok := os.LookupEnv("BASE_URL")
+	if !ok {
+		base = BASE_URL
+	}
+	full_url, _ := url.JoinPath(base, path)
+	return full_url
+}
 
 func get_and_parse(u string) *goquery.Document {
 	res, err := http.Get(u)
@@ -35,23 +45,27 @@ func get_and_parse(u string) *goquery.Document {
 }
 
 func scrape_thread(href string) feeds.Item {
-	thread_url, _ := url.JoinPath(BASE_URL, href)
-	// log.Println(thread_url)
+	thread_url := get_full_url(href)
+	log.Println(thread_url)
 	doc := get_and_parse(thread_url)
-	enclosure_url, _ := url.JoinPath(
-		BASE_URL,
-		doc.Find("ul.attachlist a[href^='attach-download']").AttrOr("href", ""))
-	return feeds.Item{
+	enclosure_url := get_full_url(
+		doc.Find("ul.attachlist a[href^='attach-download']").AttrOr("href", ""),
+	)
+	item := feeds.Item{
 		Title:       doc.Find("title").Text(),
 		Link:        &feeds.Link{Href: thread_url},
 		Description: doc.Find("div.message").Text(),
 		Enclosure:   &feeds.Enclosure{Url: enclosure_url, Length: "0", Type: "application/x-bittorrent"},
 	}
+	log.Printf("Item: %s", item.Title)
+	return item
 }
 
 func scrape_forum_page(items chan<- feeds.Item, category int, page int) {
-	forum_url := fmt.Sprintf("https://4k2.com/forum-%d-%d.htm?orderby=tid", category, page)
-	// log.Println(forum_url)
+	forum_url := get_full_url(
+		fmt.Sprintf("forum-%d-%d.htm?orderby=tid", category, page),
+	)
+	log.Println(forum_url)
 	doc := get_and_parse(forum_url)
 	var wg sync.WaitGroup
 	doc.Find("ul.threadlist li.thread div.media-body div.style3_subject a[href^='thread-']").Each(
@@ -86,7 +100,9 @@ func scrape_forum(id int, max_page int, title string, s3_path string) {
 		Created:     time.Now(),
 	}
 	for item := range items {
-		feed.Add(&item)
+		if item.Title != "" {
+			feed.Add(&item)
+		}
 	}
 	feed.Sort(func(a, b *feeds.Item) bool {
 		return a.Link.Href > b.Link.Href
