@@ -31,7 +31,21 @@ func get_full_url(path string) string {
 	return full_url
 }
 
+func proxied_url(u string) string {
+	proxy_base := os.Getenv("GOPROXY_BASE")
+	if proxy_base == "" {
+		return u
+	}
+	proxied, _ := url.JoinPath(
+		proxy_base,
+		strings.ReplaceAll(u, "://", "/"),
+	)
+	return proxied
+}
+
 func get_and_parse(u string) *goquery.Document {
+	u = proxied_url(u)
+	log.Printf("GET %s", u)
 	res, err := http.Get(u)
 	if err != nil {
 		log.Fatal(err)
@@ -46,7 +60,6 @@ func get_and_parse(u string) *goquery.Document {
 
 func scrape_thread(href string) feeds.Item {
 	thread_url := get_full_url(href)
-	log.Println(thread_url)
 	doc := get_and_parse(thread_url)
 	enclosure_url := get_full_url(
 		doc.Find("ul.attachlist a[href^='attach-download']").AttrOr("href", ""),
@@ -65,7 +78,6 @@ func scrape_forum_page(items chan<- feeds.Item, category int, page int) {
 	forum_url := get_full_url(
 		fmt.Sprintf("forum-%d-%d.htm?orderby=tid", category, page),
 	)
-	log.Println(forum_url)
 	doc := get_and_parse(forum_url)
 	var wg sync.WaitGroup
 	doc.Find("ul.threadlist li.thread div.media-body div.style3_subject a[href^='thread-']").Each(
