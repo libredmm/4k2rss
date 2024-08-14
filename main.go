@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -31,22 +32,17 @@ func get_full_url(path string) string {
 	return full_url
 }
 
-func proxied_url(u string) string {
-	proxy_base := os.Getenv("GOPROXY_BASE")
-	if proxy_base == "" {
-		return u
-	}
-	proxied, _ := url.JoinPath(
-		proxy_base,
-		strings.ReplaceAll(u, "://", "/"),
-	)
-	return proxied
+var proxyTransport = &http.Transport{
+	Proxy:           http.ProxyFromEnvironment,
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+}
+var httpClient = http.Client{
+	Transport: proxyTransport,
 }
 
 func get_and_parse(u string) *goquery.Document {
-	u = proxied_url(u)
 	log.Printf("GET %s", u)
-	res, err := http.Get(u)
+	res, err := httpClient.Get(u)
 	if err != nil {
 		log.Fatal(err)
 	}
