@@ -22,6 +22,7 @@ import (
 )
 
 const BASE_URL = "https://4k2.com/"
+const MAX_RETRY = 3
 
 func get_full_url(path string) string {
 	base := os.Getenv("BASE_URL")
@@ -40,11 +41,14 @@ var httpClient = http.Client{
 	Transport: proxyTransport,
 }
 
-func get_and_parse(u string) *goquery.Document {
-	log.Printf("GET %s", u)
+func get_and_parse(u string, retry int) *goquery.Document {
+	log.Printf("GET (#%d) %s", retry, u)
 	res, err := httpClient.Get(u)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if res.StatusCode != 200 && retry < MAX_RETRY {
+		return get_and_parse(u, retry+1)
 	}
 	defer res.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(res.Body)
@@ -56,7 +60,7 @@ func get_and_parse(u string) *goquery.Document {
 
 func scrape_thread(href string) feeds.Item {
 	thread_url := get_full_url(href)
-	doc := get_and_parse(thread_url)
+	doc := get_and_parse(thread_url, 0)
 	enclosure_url := get_full_url(
 		doc.Find("ul.attachlist a[href^='attach-download']").AttrOr("href", ""),
 	)
@@ -74,7 +78,7 @@ func scrape_forum_page(items chan<- feeds.Item, category int, page int) {
 	forum_url := get_full_url(
 		fmt.Sprintf("forum-%d-%d.htm?orderby=tid", category, page),
 	)
-	doc := get_and_parse(forum_url)
+	doc := get_and_parse(forum_url, 0)
 	var wg sync.WaitGroup
 	doc.Find("ul.threadlist li.thread div.media-body div.style3_subject a[href^='thread-']").Each(
 		func(i int, s *goquery.Selection) {
