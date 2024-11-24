@@ -30,6 +30,7 @@ func get_full_url(path string) string {
 		base = BASE_URL
 	}
 	full_url, _ := url.JoinPath(base, path)
+	full_url, _ = url.PathUnescape(full_url)
 	return full_url
 }
 
@@ -62,25 +63,25 @@ func scrape_thread(href string) feeds.Item {
 	thread_url := get_full_url(href)
 	doc := get_and_parse(thread_url, 0)
 	enclosure_url := get_full_url(
-		doc.Find("ul.attachlist a[href^='attach-download']").AttrOr("href", ""),
+		doc.Find("p.attnm a").AttrOr("href", ""),
 	)
 	item := feeds.Item{
 		Title:       doc.Find("title").Text(),
 		Link:        &feeds.Link{Href: thread_url},
-		Description: doc.Find("div.message").Text(),
+		Description: doc.Find("td.t_f").First().Text(),
 		Enclosure:   &feeds.Enclosure{Url: enclosure_url, Length: "0", Type: "application/x-bittorrent"},
 	}
-	log.Printf("Item: %s", item.Title)
+	log.Printf("Item: %s => %s", item.Title, enclosure_url)
 	return item
 }
 
 func scrape_forum_page(items chan<- feeds.Item, category int, page int) {
 	forum_url := get_full_url(
-		fmt.Sprintf("forum-%d-%d.htm?orderby=tid", category, page),
+		fmt.Sprintf("forum-%d-%d.html", category, page),
 	)
 	doc := get_and_parse(forum_url, 0)
 	var wg sync.WaitGroup
-	doc.Find("ul.threadlist li.thread div.media-body div.style3_subject a[href^='thread-']").Each(
+	doc.Find("ul#threadlisttableid a[href^='thread-']").Each(
 		func(i int, s *goquery.Selection) {
 			wg.Add(1)
 			go func() {
@@ -150,13 +151,13 @@ func scrape(pages int, interval int, dryrun bool) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			scrape_forum(1, pages, "4K2社区-亚洲有码", "feeds/4k2/hd.xml")
+			scrape_forum(2, pages, "4K2社区-亚洲有码", "feeds/4k2/hd.xml")
 		}()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			scrape_forum(3, pages, "4K2社区-4K专区", "feeds/4k2/4k.xml")
-		}()
+		// wg.Add(1)
+		// go func() {
+		// 	defer wg.Done()
+		// 	scrape_forum(3, pages, "4K2社区-4K专区", "feeds/4k2/4k.xml")
+		// }()
 		wg.Wait()
 	}
 	if interval > 0 {
