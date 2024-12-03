@@ -153,11 +153,11 @@ func scrape(pages int, interval int, dryrun bool) {
 			defer wg.Done()
 			scrape_forum(2, pages, "4K2社区-亚洲有码", "feeds/4k2/hd.xml")
 		}()
-		// wg.Add(1)
-		// go func() {
-		// 	defer wg.Done()
-		// 	scrape_forum(3, pages, "4K2社区-4K专区", "feeds/4k2/4k.xml")
-		// }()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			scrape_forum(19, pages, "4K2社区-4K超清原版", "feeds/4k2/4k.xml")
+		}()
 		wg.Wait()
 	}
 	if interval > 0 {
